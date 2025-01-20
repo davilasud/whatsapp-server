@@ -12,20 +12,21 @@ const port = 3000;
 app.use(express.json());
 app.use(cors());
 
-// Inicializa el cliente de WhatsApp
+// Variables globales
 let client = null;
-let qrCodeData = ''; // Almacena el QR temporalmente
+let clientReady = false; // Verifica si el cliente está listo
+let qrCodeData = ''; // Almacena temporalmente el QR
 
+// Función para inicializar el cliente
 function initializeClient() {
-    // Configuración del cliente con Puppeteer y estrategia de autenticación LocalAuth
- client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: path.join(__dirname, '.wwebjs_auth'),
-    }),
-    puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    },
-});
+    client = new Client({
+        authStrategy: new LocalAuth({
+            dataPath: path.join(__dirname, '.wwebjs_auth'),
+        }),
+        puppeteer: {
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        },
+    });
 
     // Eventos del cliente
     client.on('qr', (qr) => {
@@ -35,7 +36,8 @@ function initializeClient() {
 
     client.on('ready', () => {
         console.log('WhatsApp Web está listo');
-        qrCodeData = ''; // Limpia el QR una vez conectado
+        clientReady = true;
+        qrCodeData = ''; // Limpia el QR
     });
 
     client.on('authenticated', () => {
@@ -44,6 +46,13 @@ function initializeClient() {
 
     client.on('auth_failure', (msg) => {
         console.error('Error de autenticación:', msg);
+        clientReady = false; // Marca como no listo en caso de fallo
+    });
+
+    client.on('disconnected', (reason) => {
+        console.error('Cliente desconectado:', reason);
+        clientReady = false;
+        initializeClient(); // Reintenta inicializar el cliente
     });
 
     client.initialize();
@@ -53,22 +62,26 @@ function initializeClient() {
 initializeClient();
 
 // Rutas del servidor
-// Generar y obtener QR
+
+// Obtener el código QR para autenticar
 app.get('/get-qr', (req, res) => {
     if (qrCodeData) {
         qrcode.toDataURL(qrCodeData, (err, url) => {
             if (err) {
+                console.error('Error al generar el QR:', err);
                 res.status(500).send('Error al generar el QR');
             } else {
                 res.send({ qrCode: url });
             }
         });
+    } else if (clientReady) {
+        res.status(400).send({ message: 'Cliente ya autenticado' });
     } else {
-        res.status(400).send({ message: 'No hay QR disponible o ya estás autenticado' });
+        res.status(503).send({ message: 'Cliente no listo para generar QR' });
     }
 });
 
-// Endpoint para cerrar sesión
+// Cerrar sesión y reiniciar el cliente
 app.post('/logout', (req, res) => {
     if (!client) {
         return res.status(500).send({ message: 'Cliente no inicializado' });
@@ -77,41 +90,26 @@ app.post('/logout', (req, res) => {
     client.logout()
         .then(() => {
             console.log('Sesión cerrada correctamente');
+            const authPath = path.join(__dirname, '.wwebjs_auth');
 
-            client.destroy()
-                .then(() => {
-                    console.log('Cliente destruido correctamente');
-
-                    // Ruta a la carpeta de autenticación
-                    const authPath = path.join(__dirname, '.wwebjs_auth');
-
-                    // Verificar si la carpeta de autenticación existe y eliminarla
-                    if (fs.existsSync(authPath)) {
-                        fs.rm(authPath, { recursive: true, force: true }, (err) => {
-                            if (err) {
-                                console.error('Error al eliminar datos de autenticación:', err);
-                                return res.status(500).send({ message: 'Error al eliminar datos de autenticación', error: err });
-                            }
-
-                            console.log('Datos de autenticación eliminados correctamente');
-
-                            // Reinicializar el cliente
-                            initializeClient();
-
-                            res.send({ message: 'Sesión cerrada y cliente reiniciado. Ahora puedes escanear un nuevo QR.' });
-                        });
-                    } else {
-                        console.warn('No se encontraron datos de autenticación para eliminar');
-
-                        // Reinicializar directamente si no hay datos
-                        initializeClient();
-                        res.send({ message: 'Sesión cerrada, pero no había datos para eliminar. Ahora puedes escanear un nuevo QR.' });
+            if (fs.existsSync(authPath)) {
+                fs.rm(authPath, { recursive: true, force: true }, (err) => {
+                    if (err) {
+                        console.error('Error al eliminar datos de autenticación:', err);
+                        return res.status(500).send({ message: 'Error al eliminar datos de autenticación', error: err });
                     }
-                })
-                .catch((destroyErr) => {
-                    console.error('Error al destruir el cliente:', destroyErr);
-                    res.status(500).send({ message: 'Error al destruir el cliente', error: destroyErr });
+
+                    console.log('Datos de autenticación eliminados correctamente');
+                    clientReady = false;
+                    initializeClient();
+                    res.send({ message: 'Sesión cerrada y cliente reiniciado. Ahora puedes escanear un nuevo QR.' });
                 });
+            } else {
+                console.warn('No se encontraron datos de autenticación para eliminar');
+                clientReady = false;
+                initializeClient();
+                res.send({ message: 'Sesión cerrada. Ahora puedes escanear un nuevo QR.' });
+            }
         })
         .catch((err) => {
             console.error('Error al cerrar sesión:', err);
@@ -120,44 +118,46 @@ app.post('/logout', (req, res) => {
 });
 
 // Enviar mensaje a múltiples grupos
-app.post('/sendMessage', (req, res) => {
-    const { groupIds, message } = req.body;
-
-    // Validar la entrada
-    if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
-        return res.status(400).send({ message: 'Se requiere al menos un ID de grupo' });
+app.post('/sendMessage', async (req, res) => {
+    if (!clientReady) {
+        return res.status(503).send({ message: 'El cliente de WhatsApp no está listo.' });
     }
 
-    client.getChats().then((chats) => {
+    const { groupIds, message } = req.body;
+
+    if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
+        return res.status(400).send({ message: 'Se requiere al menos un ID de grupo.' });
+    }
+
+    try {
+        const chats = await client.getChats();
         const responses = [];
 
-        // Procesar cada ID de grupo
-        groupIds.forEach((groupId) => {
+        for (const groupId of groupIds) {
             const group = chats.find((chat) => chat.id._serialized === groupId);
             if (group) {
-                client.sendMessage(group.id._serialized, message)
-                    .then(() => {
-                        responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
-                        if (responses.length === groupIds.length) {
-                            res.send({ responses });
-                        }
-                    })
-                    .catch((err) => {
-                        responses.push({ groupId, status: 'error', message: 'Error al enviar mensaje', error: err });
-                        if (responses.length === groupIds.length) {
-                            res.send({ responses });
-                        }
-                    });
+                try {
+                    await client.sendMessage(group.id._serialized, message);
+                    responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
+                } catch (err) {
+                    responses.push({ groupId, status: 'error', message: 'Error al enviar mensaje', error: err.message });
+                }
             } else {
                 responses.push({ groupId, status: 'error', message: 'Grupo no encontrado' });
-                if (responses.length === groupIds.length) {
-                    res.send({ responses });
-                }
             }
-        });
-    }).catch((err) => {
-        res.status(500).send({ message: 'Error al obtener chats', error: err });
-    });
+        }
+
+        res.send({ responses });
+    } catch (err) {
+        console.error('Error al obtener los chats:', err);
+        res.status(500).send({ message: 'Error al obtener los chats', error: err.message });
+    }
+});
+
+// Manejo global de errores inesperados
+app.use((err, req, res, next) => {
+    console.error('Error inesperado:', err);
+    res.status(500).send({ message: 'Error inesperado', error: err.message });
 });
 
 // Inicia el servidor
