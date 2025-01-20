@@ -18,7 +18,7 @@ let qrCodeData = ''; // Almacena el QR temporalmente
 
 function initializeClient() {
     // Configuración del cliente con Puppeteer y estrategia de autenticación LocalAuth
-client = new Client({
+const client = new Client({
     authStrategy: new LocalAuth({
         dataPath: path.join(__dirname, '.wwebjs_auth'),
     }),
