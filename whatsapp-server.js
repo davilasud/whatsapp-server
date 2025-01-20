@@ -17,11 +17,15 @@ let client = null;
 let qrCodeData = ''; // Almacena el QR temporalmente
 
 function initializeClient() {
-    client = new Client({
-        authStrategy: new LocalAuth({
-            dataPath: path.join(__dirname, '.wwebjs_auth'),
-        }),
-    });
+    // Configuración del cliente con Puppeteer y estrategia de autenticación LocalAuth
+const client = new Client({
+    authStrategy: new LocalAuth({
+        dataPath: path.join(__dirname, '.wwebjs_auth'),
+    }),
+    puppeteer: {
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    },
+});
 
     // Eventos del cliente
     client.on('qr', (qr) => {
