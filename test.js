@@ -1,0 +1,138 @@
+const { Client, LocalAuth } = require('whatsapp-web.js');
+const express = require('express');
+const cors = require('cors');
+const qrcode = require('qrcode');
+const fs = require('fs');
+const path = require('path');
+
+const app = express();
+const port = 3000;
+
+// Middleware
+app.use(express.json());
+app.use(cors());
+
+// Variables globales
+let client = null;
+let clientReady = false;
+let qrCodeData = '';
+
+// Función para inicializar el cliente
+function initializeClient() {
+    console.log('Inicializando cliente de WhatsApp...');
+    client = new Client({
+        authStrategy: new LocalAuth({
+            dataPath: path.join(__dirname, '.wwebjs_auth'),
+        }),
+        puppeteer: {
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        },
+    });
+
+    // Eventos del cliente
+    client.on('qr', (qr) => {
+        qrCodeData = qr;
+        console.log('Escanea este código QR con tu aplicación de WhatsApp.');
+        qrcode.generate(qr, { small: true });
+    });
+
+    client.on('ready', async () => {
+        console.log('¡Cliente de WhatsApp listo!');
+        clientReady = true;
+        qrCodeData = ''; // Limpia el QR al conectarse
+
+        // Prueba de envío de mensaje
+        const testNumber = '5219621422263@c.us'; // Reemplaza con un número válido
+        const testMessage = 'Hola, este es un mensaje de prueba desde WhatsApp-web.js';
+
+        try {
+            console.log(`Enviando mensaje de prueba a ${testNumber}...`);
+            await client.sendMessage(testNumber, testMessage);
+            console.log(`Mensaje enviado exitosamente a ${testNumber}`);
+        } catch (err) {
+            console.error(`Error al enviar el mensaje de prueba a ${testNumber}:`, err);
+        }
+    });
+
+    client.on('authenticated', () => {
+        console.log('Autenticación exitosa');
+    });
+
+    client.on('auth_failure', (msg) => {
+        console.error('Error de autenticación:', msg);
+        clientReady = false;
+    });
+
+    client.on('disconnected', (reason) => {
+        console.warn('Cliente desconectado:', reason);
+        clientReady = false;
+        initializeClient(); // Reinicia el cliente si se desconecta
+    });
+
+    client.initialize();
+}
+
+// Inicializa el cliente por primera vez
+initializeClient();
+
+// Rutas del servidor
+
+// Obtener el código QR para autenticar
+app.get('/get-qr', (req, res) => {
+    console.log('Petición recibida en /get-qr');
+    if (qrCodeData) {
+        qrcode.toDataURL(qrCodeData, (err, url) => {
+            if (err) {
+                console.error('Error al generar QR:', err);
+                return res.status(500).send('Error al generar el QR');
+            }
+            res.send({ qrCode: url });
+        });
+    } else if (clientReady) {
+        res.status(400).send({ message: 'Cliente ya autenticado' });
+    } else {
+        res.status(503).send({ message: 'Cliente no listo para generar QR' });
+    }
+});
+
+// Cerrar sesión y reiniciar el cliente
+app.post('/logout', (req, res) => {
+    console.log('Petición recibida en /logout');
+    if (!client) {
+        return res.status(500).send({ message: 'Cliente no inicializado' });
+    }
+
+    client.logout()
+        .then(() => {
+            console.log('Sesión cerrada correctamente');
+            const authPath = path.join(__dirname, '.wwebjs_auth');
+
+            if (fs.existsSync(authPath)) {
+                fs.rm(authPath, { recursive: true, force: true }, (err) => {
+                    if (err) {
+                        console.error('Error al eliminar datos de autenticación:', err);
+                        return res.status(500).send({ message: 'Error al eliminar datos de autenticación', error: err });
+                    }
+
+                    console.log('Datos de autenticación eliminados correctamente');
+                    clientReady = false;
+                    initializeClient();
+                    res.send({ message: 'Sesión cerrada y cliente reiniciado. Ahora puedes escanear un nuevo QR.' });
+                });
+            } else {
+                console.warn('No se encontraron datos de autenticación para eliminar');
+                clientReady = false;
+                initializeClient();
+                res.send({ message: 'Sesión cerrada. Ahora puedes escanear un nuevo QR.' });
+            }
+        })
+        .catch((err) => {
+            console.error('Error al cerrar sesión:', err);
+            res.status(500).send({ message: 'Error al cerrar sesión', error: err });
+        });
+});
+
+// Inicia el servidor
+app.listen(port, () => {
+    console.log(`Servidor de WhatsApp-web.js corriendo en http://localhost:${port}`);
+});
