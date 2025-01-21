@@ -129,10 +129,32 @@ app.post('/sendMessage', async (req, res) => {
     }
 });
 
-app.get('/test', (req, res) => {
-    res.send({ message: 'Servidor funcionando correctamente' });
-    console.log('Respuesta enviada en /test');
+app.post('/test', async (req, res) => {
+    console.log('Petición recibida en /test:', req.body);
+
+    if (!clientReady) {
+        console.log('Cliente no está listo.');
+        return res.status(503).send({ message: 'El cliente de WhatsApp no está listo.' });
+    }
+
+    const { phoneNumber, message } = req.body;
+
+    if (!phoneNumber || !message) {
+        console.log('Número de teléfono o mensaje faltante.');
+        return res.status(400).send({ message: 'Se requiere un número de teléfono y un mensaje.' });
+    }
+
+    try {
+        console.log(`Intentando enviar mensaje al número ${phoneNumber}`);
+        await client.sendMessage(`${phoneNumber}@c.us`, message);
+        console.log(`Mensaje enviado exitosamente al número ${phoneNumber}`);
+        res.send({ status: 'success', message: 'Mensaje enviado correctamente' });
+    } catch (err) {
+        console.error(`Error al enviar mensaje al número ${phoneNumber}:`, err);
+        res.status(500).send({ status: 'error', message: 'Error al enviar mensaje', error: err.message });
+    }
 });
+
 
 app.post('/testMessage', async (req, res) => {
     console.log('Petición recibida en /testMessage:', req.body);
