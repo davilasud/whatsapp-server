@@ -152,8 +152,10 @@ app.post('/testMessage', async (req, res) => {
     console.log('Iniciando proceso para enviar mensajes...');
 
     try {
+        console.log('Intentando obtener chats...');
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Espera 5 segundos
         const chats = await client.getChats();
-        console.log('Chats obtenidos:', chats.map(chat => chat.id._serialized));
+        console.log('Chats obtenidos exitosamente:', chats.map(chat => chat.id._serialized));
 
         const responses = [];
 
