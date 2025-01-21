@@ -155,8 +155,9 @@ app.post('/testMessage', async (req, res) => {
         for (const groupId of groupIds) {
             console.log(`Procesando grupo: ${groupId}`);
             try {
+                console.log(`Intentando enviar mensaje al grupo ${groupId}`);
                 await client.sendMessage(groupId, message);
-                console.log(`Mensaje enviado al grupo ${groupId}`);
+                console.log(`Mensaje enviado exitosamente al grupo ${groupId}`);
                 responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
             } catch (err) {
                 console.error(`Error al enviar mensaje al grupo ${groupId}:`, err);
