@@ -134,6 +134,12 @@ app.get('/test', (req, res) => {
     console.log('Respuesta enviada en /test');
 });
 
+app.post('/testMessage', (req, res) => {
+    console.log('Petición recibida en /sendMessage:', req.body);
+    res.send({ message: 'Solicitud recibida correctamente' });
+});
+
+
 
 
 // Cerrar sesión y reiniciar el cliente
