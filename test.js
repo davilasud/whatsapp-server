@@ -36,22 +36,10 @@ function initializeClient() {
         qrcode.generate(qr, { small: true });
     });
 
-    client.on('ready', async () => {
+    client.on('ready', () => {
         console.log('¡Cliente de WhatsApp listo!');
         clientReady = true;
         qrCodeData = ''; // Limpia el QR al conectarse
-
-        // Prueba de envío de mensaje
-        const testNumber = '5219621422263@c.us'; // Reemplaza con un número válido
-        const testMessage = 'Hola, este es un mensaje de prueba desde WhatsApp-web.js';
-
-        try {
-            console.log(`Enviando mensaje de prueba a ${testNumber}...`);
-            await client.sendMessage(testNumber, testMessage);
-            console.log(`Mensaje enviado exitosamente a ${testNumber}`);
-        } catch (err) {
-            console.error(`Error al enviar el mensaje de prueba a ${testNumber}:`, err);
-        }
     });
 
     client.on('authenticated', () => {
@@ -92,6 +80,53 @@ app.get('/get-qr', (req, res) => {
         res.status(400).send({ message: 'Cliente ya autenticado' });
     } else {
         res.status(503).send({ message: 'Cliente no listo para generar QR' });
+    }
+});
+
+// Enviar mensaje a múltiples grupos
+app.post('/sendMessage', async (req, res) => {
+    console.log('Petición recibida en /sendMessage:', req.body);
+
+    if (!clientReady) {
+        return res.status(503).send({ message: 'El cliente de WhatsApp no está listo.' });
+    }
+
+    const { groupIds, message } = req.body;
+
+    // Validar la entrada
+    if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
+        return res.status(400).send({ message: 'Se requiere al menos un ID de grupo.' });
+    }
+
+    try {
+        const chats = await client.getChats();
+        console.log('Chats disponibles:', chats.map((chat) => chat.id._serialized));
+
+        const responses = [];
+
+        // Procesar cada ID de grupo
+        for (const groupId of groupIds) {
+            const group = chats.find((chat) => chat.id._serialized === groupId);
+
+            if (group) {
+                try {
+                    await client.sendMessage(group.id._serialized, message);
+                    responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
+                } catch (err) {
+                    console.error(`Error al enviar mensaje al grupo ${groupId}:`, err);
+                    responses.push({ groupId, status: 'error', message: 'Error al enviar mensaje', error: err.message });
+                }
+            } else {
+                console.warn(`Grupo no encontrado: ${groupId}`);
+                responses.push({ groupId, status: 'error', message: 'Grupo no encontrado' });
+            }
+        }
+
+        console.log('Respuestas enviadas:', responses);
+        res.send({ responses });
+    } catch (err) {
+        console.error('Error al obtener los chats:', err);
+        res.status(500).send({ message: 'Error al obtener los chats', error: err.message });
     }
 });
 
