@@ -149,37 +149,18 @@ app.post('/testMessage', async (req, res) => {
         return res.status(400).send({ message: 'Se requiere al menos un ID de grupo.' });
     }
 
-    console.log('Iniciando proceso para enviar mensajes...');
+    const responses = [];
 
     try {
-        console.log('Intentando obtener chats...');
-        const chats = [
-    { id: { _serialized: '5219621422263@c.us' }, name: 'Grupo 1' },
-    { id: { _serialized: '5219622950724@c.us' }, name: 'Grupo 2' }
-];
-console.log('Chats simulados:', chats.map(chat => chat.id._serialized));
-
-        console.log('Chats obtenidos exitosamente:', chats.map(chat => chat.id._serialized));
-
-        const responses = [];
-
         for (const groupId of groupIds) {
             console.log(`Procesando grupo: ${groupId}`);
-            const group = chats.find(chat => chat.id._serialized === groupId);
-
-            if (group) {
-                console.log(`Grupo encontrado: ${groupId}`);
-                try {
-                    await client.sendMessage(group.id._serialized, message);
-                    console.log(`Mensaje enviado al grupo ${groupId}`);
-                    responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
-                } catch (err) {
-                    console.error(`Error al enviar mensaje al grupo ${groupId}:`, err);
-                    responses.push({ groupId, status: 'error', message: 'Error al enviar mensaje', error: err.message });
-                }
-            } else {
-                console.warn(`Grupo no encontrado: ${groupId}`);
-                responses.push({ groupId, status: 'error', message: 'Grupo no encontrado' });
+            try {
+                await client.sendMessage(groupId, message);
+                console.log(`Mensaje enviado al grupo ${groupId}`);
+                responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
+            } catch (err) {
+                console.error(`Error al enviar mensaje al grupo ${groupId}:`, err);
+                responses.push({ groupId, status: 'error', message: 'Error al enviar mensaje', error: err.message });
             }
         }
 
