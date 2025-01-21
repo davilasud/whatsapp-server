@@ -195,6 +195,33 @@ app.post('/testMessage', async (req, res) => {
     }
 });
 
+app.post('/testGroup', async (req, res) => {
+    console.log('Petición recibida en /testGroup:', req.body);
+
+    if (!clientReady) {
+        console.log('Cliente no está listo.');
+        return res.status(503).send({ message: 'El cliente de WhatsApp no está listo.' });
+    }
+
+    const { groupId, message } = req.body;
+
+    if (!groupId || !message) {
+        console.log('ID de grupo o mensaje faltante.');
+        return res.status(400).send({ message: 'Se requiere un ID de grupo y un mensaje.' });
+    }
+
+    try {
+        console.log(`Intentando enviar mensaje al grupo ${groupId}`);
+        await client.sendMessage(groupId, message);
+        console.log(`Mensaje enviado exitosamente al grupo ${groupId}`);
+        res.send({ status: 'success', message: 'Mensaje enviado correctamente' });
+    } catch (err) {
+        console.error(`Error al enviar mensaje al grupo ${groupId}:`, err);
+        res.status(500).send({ status: 'error', message: 'Error al enviar mensaje', error: err.message });
+    }
+});
+
+
 
 // Cerrar sesión y reiniciar el cliente
 app.post('/logout', (req, res) => {
