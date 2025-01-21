@@ -17,6 +17,23 @@ let client = null;
 let clientReady = false;
 let qrCodeData = '';
 
+
+//funcion para asegurar la sesion 
+async function ensureClientConnected() {
+    let attempts = 0;
+    while (attempts < 10) { // Reintenta hasta 10 veces
+        const state = await client.getState();
+        if (state === 'CONNECTED') {
+            return true;
+        }
+        console.log(`Estado actual: ${state}. Reintentando en 2 segundos...`);
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Espera 2 segundos
+        attempts++;
+    }
+    return false;
+}
+
+
 // Función para inicializar el cliente
 function initializeClient() {
     console.log('Inicializando cliente de WhatsApp...');
@@ -159,6 +176,12 @@ app.post('/sendMessage', async (req, res) => {
 app.post('/test', async (req, res) => {
     console.log('Petición recibida en /test:', req.body);
 
+    if (!await ensureClientConnected()) {
+    console.log('El cliente no se conectó completamente después de varios intentos.');
+    return res.status(503).send({ message: 'El cliente no está completamente conectado.' });
+    }
+
+
     if (!clientReady) {
         console.log('Cliente no está listo.');
         return res.status(503).send({ message: 'El cliente de WhatsApp no está listo.' });
@@ -172,6 +195,14 @@ app.post('/test', async (req, res) => {
     }
 
     try {
+        console.log('Verificando estado del cliente...');
+        const state = await client.getState();
+        console.log(`Estado actual del cliente: ${state}`);
+
+        if (state !== 'CONNECTED') {
+            return res.status(503).send({ message: 'El cliente no está conectado completamente.' });
+        }
+
         console.log(`Intentando enviar mensaje al número ${phoneNumber}`);
         await client.sendMessage(`${phoneNumber}@c.us`, message);
         console.log(`Mensaje enviado exitosamente al número ${phoneNumber}`);
@@ -181,6 +212,8 @@ app.post('/test', async (req, res) => {
         res.status(500).send({ status: 'error', message: 'Error al enviar mensaje', error: err.message });
     }
 });
+
+
 
 
 app.post('/testMessage', async (req, res) => {
