@@ -134,10 +134,55 @@ app.get('/test', (req, res) => {
     console.log('Respuesta enviada en /test');
 });
 
-app.post('/testMessage', (req, res) => {
-    console.log('Petición recibida en /sendMessage:', req.body);
-    res.send({ message: 'Solicitud recibida correctamente' });
+app.post('/testMessage', async (req, res) => {
+    console.log('Petición recibida en /testMessage:', req.body);
+
+    if (!clientReady) {
+        return res.status(503).send({ message: 'El cliente de WhatsApp no está listo.' });
+    }
+
+    const { groupIds, message } = req.body;
+
+    // Validar la entrada
+    if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
+        return res.status(400).send({ message: 'Se requiere al menos un ID de grupo.' });
+    }
+
+    try {
+        // Obtener los chats disponibles
+        const chats = await client.getChats();
+        console.log('Chats obtenidos:', chats.map(chat => chat.id._serialized));
+
+        const responses = [];
+
+        // Procesar cada ID de grupo
+        for (const groupId of groupIds) {
+            console.log(`Procesando grupo: ${groupId}`);
+            const group = chats.find(chat => chat.id._serialized === groupId);
+
+            if (group) {
+                console.log(`Grupo encontrado: ${groupId}`);
+                try {
+                    await client.sendMessage(group.id._serialized, message);
+                    responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
+                } catch (err) {
+                    console.error(`Error al enviar mensaje al grupo ${groupId}:`, err);
+                    responses.push({ groupId, status: 'error', message: 'Error al enviar mensaje', error: err.message });
+                }
+            } else {
+                console.warn(`Grupo no encontrado: ${groupId}`);
+                responses.push({ groupId, status: 'error', message: 'Grupo no encontrado' });
+            }
+        }
+
+        console.log('Respuestas enviadas:', responses);
+        res.send({ responses });
+    } catch (err) {
+        console.error('Error al obtener los chats:', err);
+        res.status(500).send({ message: 'Error al obtener los chats', error: err.message });
+    }
 });
+
 
 
 
