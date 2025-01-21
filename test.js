@@ -83,7 +83,6 @@ app.get('/get-qr', (req, res) => {
     }
 });
 
-// Enviar mensaje a múltiples grupos
 app.post('/sendMessage', async (req, res) => {
     console.log('Petición recibida en /sendMessage:', req.body);
 
@@ -104,7 +103,7 @@ app.post('/sendMessage', async (req, res) => {
 
         const responses = [];
 
-        // Procesar cada ID de grupo
+        // Procesar cada ID de grupo de forma asincrónica
         for (const groupId of groupIds) {
             const group = chats.find((chat) => chat.id._serialized === groupId);
 
@@ -123,12 +122,13 @@ app.post('/sendMessage', async (req, res) => {
         }
 
         console.log('Respuestas enviadas:', responses);
-        res.send({ responses });
+        res.send({ responses }); // Enviar la respuesta al cliente
     } catch (err) {
         console.error('Error al obtener los chats:', err);
         res.status(500).send({ message: 'Error al obtener los chats', error: err.message });
     }
 });
+
 
 // Cerrar sesión y reiniciar el cliente
 app.post('/logout', (req, res) => {
