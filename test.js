@@ -138,24 +138,25 @@ app.post('/testMessage', async (req, res) => {
     console.log('Petición recibida en /testMessage:', req.body);
 
     if (!clientReady) {
+        console.log('Cliente no está listo.');
         return res.status(503).send({ message: 'El cliente de WhatsApp no está listo.' });
     }
 
     const { groupIds, message } = req.body;
 
-    // Validar la entrada
     if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
+        console.log('Faltan IDs de grupo.');
         return res.status(400).send({ message: 'Se requiere al menos un ID de grupo.' });
     }
 
+    console.log('Iniciando proceso para enviar mensajes...');
+
     try {
-        // Obtener los chats disponibles
         const chats = await client.getChats();
         console.log('Chats obtenidos:', chats.map(chat => chat.id._serialized));
 
         const responses = [];
 
-        // Procesar cada ID de grupo
         for (const groupId of groupIds) {
             console.log(`Procesando grupo: ${groupId}`);
             const group = chats.find(chat => chat.id._serialized === groupId);
@@ -164,6 +165,7 @@ app.post('/testMessage', async (req, res) => {
                 console.log(`Grupo encontrado: ${groupId}`);
                 try {
                     await client.sendMessage(group.id._serialized, message);
+                    console.log(`Mensaje enviado al grupo ${groupId}`);
                     responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
                 } catch (err) {
                     console.error(`Error al enviar mensaje al grupo ${groupId}:`, err);
@@ -175,16 +177,13 @@ app.post('/testMessage', async (req, res) => {
             }
         }
 
-        console.log('Respuestas enviadas:', responses);
+        console.log('Respuestas generadas:', responses);
         res.send({ responses });
     } catch (err) {
-        console.error('Error al obtener los chats:', err);
-        res.status(500).send({ message: 'Error al obtener los chats', error: err.message });
+        console.error('Error general en /testMessage:', err);
+        res.status(500).send({ message: 'Error inesperado', error: err.message });
     }
 });
-
-
-
 
 
 // Cerrar sesión y reiniciar el cliente
