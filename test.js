@@ -83,6 +83,12 @@ app.get('/get-qr', (req, res) => {
     }
 });
 
+app.get('/status', (req, res) => {
+    res.send({ clientReady, qrCodeData });
+    console.log(`Estado del cliente: ${clientReady ? 'Listo' : 'No listo'}`);
+});
+
+
 app.post('/sendMessage', async (req, res) => {
     console.log('Petición recibida en /sendMessage:', req.body);
 
