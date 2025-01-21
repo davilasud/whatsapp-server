@@ -129,6 +129,12 @@ app.post('/sendMessage', async (req, res) => {
     }
 });
 
+app.get('/test', (req, res) => {
+    res.send({ message: 'Servidor funcionando correctamente' });
+    console.log('Respuesta enviada en /test');
+});
+
+
 
 // Cerrar sesión y reiniciar el cliente
 app.post('/logout', (req, res) => {
