@@ -352,6 +352,30 @@ app.post('/forceLogout', (req, res) => {
     }
 });
 
+app.post('/clearCache', async (req, res) => {
+    if (!client) {
+        console.log('Cliente no inicializado. No se puede limpiar la caché.');
+        return res.status(500).send({ message: 'El cliente no está inicializado.' });
+    }
+
+    try {
+        const browser = await client.pupBrowser;
+        const pages = await browser.pages();
+
+        for (const page of pages) {
+            console.log('Limpiando caché del navegador...');
+            await page.setCacheEnabled(false);
+        }
+
+        console.log('Caché del navegador limpiada correctamente.');
+        res.send({ message: 'Caché del navegador de Puppeteer limpiada correctamente.' });
+    } catch (err) {
+        console.error('Error al limpiar la caché del navegador:', err);
+        res.status(500).send({ message: 'Error al limpiar la caché del navegador.', error: err.message });
+    }
+});
+
+
 
 // Inicia el servidor
 app.listen(port, () => {
