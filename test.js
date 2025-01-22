@@ -53,24 +53,69 @@ function initializeClient() {
         qrcode.generate(qr, { small: true });
     });
 
+    async function waitForConnection(client, maxAttempts = 10) {
+        let attempts = 0;
+        while (attempts < maxAttempts) {
+            const state = await client.getState();
+            if (state === 'CONNECTED') {
+                console.log('Cliente sincronizado completamente.');
+                return true;
+            }
+            console.log(`Estado actual: ${state}. Reintentando en 3 segundos...`);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Espera 3 segundos
+            attempts++;
+        }
+        console.log('No se logró sincronizar el cliente completamente después de varios intentos.');
+        return false;
+    }
+    
+
 
 
 
     client.on('ready', async () => {
-    console.log('¡Cliente de WhatsApp listo!');
-    clientReady = true;
+        console.log('¡Cliente de WhatsApp listo! Verificando estado de conexión...');
+        const state = await client.getState();
+        console.log(`Estado inicial del cliente: ${state}`);
+    
+        if (state === 'CONNECTED') {
+            console.log('Cliente completamente conectado.');
+            clientReady = true;
+    
+            // Limpieza de caché
+            const browser = await client.pupBrowser;
+            const pages = await browser.pages();
+            for (const page of pages) {
+                console.log('Limpiando caché del navegador...');
+                await page.setCacheEnabled(false);
+            }
+    
+            // Intentar enviar un mensaje de prueba
+            const testNumber = '5219621422263@c.us';
+            const testMessage = 'Mensaje de prueba inmediato después de estar listo';
+            try {
+                console.log(`Intentando enviar mensaje al número ${testNumber}`);
+                await client.sendMessage(testNumber, testMessage);
+                console.log(`Mensaje enviado exitosamente al número ${testNumber}`);
+            } catch (err) {
+                console.error(`Error al enviar mensaje al número ${testNumber}:`, err);
+            }
+        } else {
+            console.log('Cliente no está completamente conectado. Esperando...');
+            clientReady = false;
+        }
 
-    // Prueba de envío inmediato
-    const testNumber = '5219621422263@c.us';
-    const testMessage = 'Mensaje de prueba inmediato después de estar listo';
-    try {
-        console.log(`Intentando enviar mensaje al número ${testNumber}`);
-        await client.sendMessage(testNumber, testMessage);
-        console.log(`Mensaje enviado exitosamente al número ${testNumber}`);
-    } catch (err) {
-        console.error(`Error al enviar mensaje al número ${testNumber}:`, err);
-    }
-});
+        console.log('¡Cliente de WhatsApp listo! Esperando sincronización completa...');
+        const isConnected = await waitForConnection(client);
+        if (isConnected) {
+            console.log('Cliente completamente sincronizado.');
+            clientReady = true;
+        } else {
+            console.log('El cliente no se pudo sincronizar completamente.');
+            clientReady = false;
+        }
+    });
+    
 
 
     client.on('authenticated', () => {
