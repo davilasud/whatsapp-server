@@ -53,11 +53,22 @@ function initializeClient() {
         qrcode.generate(qr, { small: true });
     });
 
-    client.on('ready', () => {
-        console.log('¡Cliente de WhatsApp listo!');
-        clientReady = true;
-        qrCodeData = ''; // Limpia el QR al conectarse
-    });
+    client.on('ready', async () => {
+    console.log('¡Cliente de WhatsApp listo!');
+    clientReady = true;
+
+    // Prueba de envío inmediato
+    const testNumber = '5219621422263@c.us';
+    const testMessage = 'Mensaje de prueba inmediato después de estar listo';
+    try {
+        console.log(`Intentando enviar mensaje al número ${testNumber}`);
+        await client.sendMessage(testNumber, testMessage);
+        console.log(`Mensaje enviado exitosamente al número ${testNumber}`);
+    } catch (err) {
+        console.error(`Error al enviar mensaje al número ${testNumber}:`, err);
+    }
+});
+
 
     client.on('ready', async () => {
     console.log('¡Cliente de WhatsApp listo!');
