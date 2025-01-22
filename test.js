@@ -346,8 +346,8 @@ app.post('/forceLogout', (req, res) => {
             clientReady = false;
             res.send({ message: 'Sesión forzada cerrada y datos eliminados. Reinicia el cliente para generar un nuevo QR.' });
             // Inicializa el cliente por logout
-            initializeClient();
-            console.log('Sesion Re-Inicializada');
+            /* initializeClient();
+            console.log('Sesion Re-Inicializada'); */
         });
     } else {
         console.log('No se encontró la carpeta de autenticación para eliminar.');
