@@ -160,6 +160,6 @@ app.get('/get-qr', (req, res) => {
 }); */
 
 // Inicia el servidor
-/* app.listen(port, () => {
+app.listen(port, () => {
     console.log(`Servidor de WhatsApp-web.js corriendo en http://localhost:${port}`);
-}); */
+});
