@@ -186,8 +186,8 @@ app.get('/get-qr', async (req, res) => {
         }
 
         // Reiniciar el cliente
-        /* console.log('Reiniciando cliente...');
-        initializeClient(); */
+        console.log('Reiniciando cliente...');
+        initializeClient();
     }
 
     if (qrCodeData) {
