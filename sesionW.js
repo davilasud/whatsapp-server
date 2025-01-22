@@ -6,7 +6,7 @@ const fs = require('fs');
 const path = require('path');
 
 const app = express();
-//const port = 3000;
+const port = 3000;
 
 // Middleware
 app.use(express.json());
@@ -18,10 +18,13 @@ let qrCodeData = ''; // Almacena el QR temporalmente
 
 function initializeClient() {
     client = new Client({
-        authStrategy: new LocalAuth({
-            dataPath: path.join(__dirname, '.wwebjs_auth'),
-        }),
-    });
+            authStrategy: new LocalAuth({
+                dataPath: path.join(__dirname, '.wwebjs_auth'),
+            }),
+            puppeteer: {
+                args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            },
+        });
 
     // Eventos del cliente
     client.on('qr', (qr) => {
