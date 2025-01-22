@@ -53,21 +53,7 @@ function initializeClient() {
         qrcode.generate(qr, { small: true });
     });
 
-    client.on('ready', async () => {
-    console.log('¡Cliente de WhatsApp listo!');
-    clientReady = true;
 
-    // Prueba de envío inmediato
-    const testNumber = '5219621422263@c.us';
-    const testMessage = 'Mensaje de prueba inmediato después de estar listo';
-    try {
-        console.log(`Intentando enviar mensaje al número ${testNumber}`);
-        await client.sendMessage(testNumber, testMessage);
-        console.log(`Mensaje enviado exitosamente al número ${testNumber}`);
-    } catch (err) {
-        console.error(`Error al enviar mensaje al número ${testNumber}:`, err);
-    }
-});
 
 
     client.on('ready', async () => {
@@ -97,14 +83,20 @@ function initializeClient() {
     });
 
     client.on('disconnected', (reason) => {
-        console.warn('Cliente desconectado:', reason);
+        console.warn(`Cliente desconectado: ${reason}`);
         clientReady = false;
-        initializeClient(); // Reinicia el cliente si se desconecta
+        setTimeout(() => {
+            console.log('Reiniciando cliente después de desconexión...');
+            initializeClient();
+        }, 5000); // Espera 5 segundos antes de reiniciar
     });
+    
 
     client.on('state_changed', (state) => {
-    console.log(`Estado del cliente cambiado: ${state}`);
+        console.log(`Estado del cliente cambiado: ${state}`);
+        clientReady = (state === 'CONNECTED');
     });
+    
 
     client.initialize();
 }
@@ -114,9 +106,45 @@ initializeClient();
 
 // Rutas del servidor
 
-// Obtener el código QR para autenticar
-app.get('/get-qr', (req, res) => {
+app.get('/get-qr', async (req, res) => {
     console.log('Petición recibida en /get-qr');
+
+    if (!clientReady) {
+        console.log('No hay sesión activa. Procediendo a limpiar datos de sesión y caché.');
+
+        // Eliminar la carpeta de sesión
+        const authPath = path.join(__dirname, '.wwebjs_auth');
+        if (fs.existsSync(authPath)) {
+            try {
+                fs.rmSync(authPath, { recursive: true, force: true });
+                console.log('Carpeta de sesión eliminada correctamente.');
+            } catch (err) {
+                console.error('Error al eliminar la carpeta de sesión:', err);
+                return res.status(500).send({ message: 'Error al limpiar datos de sesión.', error: err.message });
+            }
+        } else {
+            console.log('No se encontró la carpeta de sesión para eliminar.');
+        }
+
+        // Limpiar la caché de Puppeteer
+        try {
+            const browser = await client.pupBrowser;
+            const pages = await browser.pages();
+            for (const page of pages) {
+                console.log('Limpiando caché del navegador...');
+                await page.setCacheEnabled(false);
+            }
+            console.log('Caché del navegador limpiada correctamente.');
+        } catch (err) {
+            console.error('Error al limpiar la caché del navegador:', err);
+            return res.status(500).send({ message: 'Error al limpiar la caché del navegador.', error: err.message });
+        }
+
+        // Reiniciar el cliente
+        console.log('Reiniciando cliente...');
+        initializeClient();
+    }
+
     if (qrCodeData) {
         qrcode.toDataURL(qrCodeData, (err, url) => {
             if (err) {
@@ -131,6 +159,7 @@ app.get('/get-qr', (req, res) => {
         res.status(503).send({ message: 'Cliente no listo para generar QR' });
     }
 });
+
 
 app.get('/status', (req, res) => {
     res.send({ clientReady, qrCodeData });
