@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "sesionW.js",
+    "start": "node sesionW.js",
     "test": "echo \"Error: no test specifiedd\" && exit 1"
   },
   "keywords": [],
