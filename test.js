@@ -67,24 +67,7 @@ function initializeClient() {
     } catch (err) {
         console.error(`Error al enviar mensaje al número ${testNumber}:`, err);
     }
-});
-
-
-    client.on('ready', async () => {
-    console.log('¡Cliente de WhatsApp listo!');
-    clientReady = true;
-
-    // Prueba de envío inmediato
-    const testNumber = '5219621422263@c.us';
-    const testMessage = 'Mensaje de prueba inmediato después de estar listo';
-    try {
-        console.log(`Intentando enviar mensaje al número ${testNumber}`);
-        await client.sendMessage(testNumber, testMessage);
-        console.log(`Mensaje enviado exitosamente al número ${testNumber}`);
-    } catch (err) {
-        console.error(`Error al enviar mensaje al número ${testNumber}:`, err);
-    }
-});
+    });
 
 
     client.on('authenticated', () => {
@@ -225,47 +208,6 @@ app.post('/test', async (req, res) => {
 });
 
 
-
-
-app.post('/testMessage', async (req, res) => {
-    console.log('Petición recibida en /testMessage:', req.body);
-
-    if (!clientReady) {
-        console.log('Cliente no está listo.');
-        return res.status(503).send({ message: 'El cliente de WhatsApp no está listo.' });
-    }
-
-    const { groupIds, message } = req.body;
-
-    if (!groupIds || !Array.isArray(groupIds) || groupIds.length === 0) {
-        console.log('Faltan IDs de grupo.');
-        return res.status(400).send({ message: 'Se requiere al menos un ID de grupo.' });
-    }
-
-    const responses = [];
-
-    try {
-        for (const groupId of groupIds) {
-            console.log(`Procesando grupo: ${groupId}`);
-            try {
-                console.log(`Intentando enviar mensaje al grupo ${groupId}`);
-                await client.sendMessage(groupId, message);
-                console.log(`Mensaje enviado exitosamente al grupo ${groupId}`);
-                responses.push({ groupId, status: 'success', message: 'Mensaje enviado correctamente' });
-            } catch (err) {
-                console.error(`Error al enviar mensaje al grupo ${groupId}:`, err);
-                responses.push({ groupId, status: 'error', message: 'Error al enviar mensaje', error: err.message });
-            }
-        }
-
-        console.log('Respuestas generadas:', responses);
-        res.send({ responses });
-    } catch (err) {
-        console.error('Error general en /testMessage:', err);
-        res.status(500).send({ message: 'Error inesperado', error: err.message });
-    }
-});
-
 app.post('/testGroup', async (req, res) => {
     console.log('Petición recibida en /testGroup:', req.body);
 
@@ -291,6 +233,27 @@ app.post('/testGroup', async (req, res) => {
         res.status(500).send({ status: 'error', message: 'Error al enviar mensaje', error: err.message });
     }
 });
+
+app.post('/forceLogout', (req, res) => {
+    const authPath = path.join(__dirname, '.wwebjs_auth');
+    console.log(`Intentando eliminar la carpeta de autenticación en: ${authPath}`);
+
+    if (fs.existsSync(authPath)) {
+        fs.rm(authPath, { recursive: true, force: true }, (err) => {
+            if (err) {
+                console.error('Error al eliminar la carpeta de autenticación:', err);
+                return res.status(500).send({ message: 'Error al eliminar la carpeta de autenticación', error: err });
+            }
+            console.log('Carpeta de autenticación eliminada correctamente');
+            clientReady = false;
+            res.send({ message: 'Sesión forzada cerrada y datos eliminados. Reinicia el cliente para generar un nuevo QR.' });
+        });
+    } else {
+        console.log('No se encontró la carpeta de autenticación para eliminar.');
+        res.status(404).send({ message: 'No se encontró la carpeta de autenticación.' });
+    }
+});
+
 
 
 
